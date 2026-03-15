@@ -2,13 +2,15 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Video, Image, Eye } from 'lucide-react'
+import { LayoutDashboard, Video, Image, Eye, Search, Lightbulb } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/video-ads', label: 'Video Ads', icon: Video },
   { href: '/static-ads', label: 'Static Ads', icon: Image },
+  { href: '/spy', label: 'Ad Spy', icon: Search },
+  { href: '/hooks', label: 'Hook Vault', icon: Lightbulb },
 ]
 
 export function Sidebar() {
