@@ -97,6 +97,9 @@ export function AdVault() {
 
   // Sort
   switch (filters.sort) {
+    case 'Newest':
+      filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      break
     case 'Oldest':
       filtered.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
       break
