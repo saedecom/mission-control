@@ -100,6 +100,14 @@ export function AdVault() {
     case 'Oldest':
       filtered.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
       break
+    case 'Most Impressions':
+      // Longest running ads = most accumulated impressions (FB doesn't expose exact counts)
+      filtered.sort((a, b) => {
+        const aStart = a.start_date ? new Date(a.start_date).getTime() : Date.now()
+        const bStart = b.start_date ? new Date(b.start_date).getTime() : Date.now()
+        return aStart - bStart // oldest start_date first = longest running
+      })
+      break
     case 'Most Weeks':
       filtered.sort((a, b) => b.weeks_in_top10 - a.weeks_in_top10)
       break

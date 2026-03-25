@@ -19,19 +19,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Brand not found' }, { status: 404 })
     }
 
-    // Start Apify actor run
+    // Start Apify actor run using startUrls format
+    const adLibraryUrl = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=US&view_all_page_id=${brand.page_id}&search_type=page&media_type=all`
     const response = await fetch(
       `https://api.apify.com/v2/acts/${ACTOR_ID}/runs?token=${APIFY_TOKEN}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          adActiveStatus: 'active',
-          adType: 'all',
-          countryCode: 'US',
-          pageIds: [brand.page_id],
+          startUrls: [{ url: adLibraryUrl }],
           resultsLimit: 20,
-          searchType: 'page',
         }),
       }
     )

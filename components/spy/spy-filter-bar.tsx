@@ -127,7 +127,7 @@ export function SpyFilterBar({ filters, onChange, brands }: SpyFilterBarProps) {
         label="Sort"
         value={filters.sort}
         onChange={(v) => update('sort', v)}
-        options={['Newest', 'Oldest', 'Most Weeks', 'Rank']}
+        options={['Newest', 'Oldest', 'Most Impressions', 'Most Weeks', 'Rank']}
       />
     </div>
   )

@@ -15,9 +15,17 @@ interface ApifyAdResult {
       title?: string
       body?: string
       link_url?: string
+      linkUrl?: string
+      originalImageUrl?: string
+      resizedImageUrl?: string
+      videoHdUrl?: string
+      videoSdUrl?: string
+      videoPreviewImageUrl?: string
     }>
     cta_text?: string
     cta_type?: string
+    ctaText?: string
+    ctaType?: string
     videos?: Array<{ video_hd_url?: string; video_sd_url?: string; video_preview_image_url?: string }>
     images?: Array<{ original_image_url?: string; resized_image_url?: string }>
     link_url?: string
@@ -28,6 +36,42 @@ interface ApifyAdResult {
   collationCount?: number
   currency?: string
   pageName?: string
+}
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
+const STORAGE_BUCKET = 'ad-creatives'
+
+async function uploadToStorage(sourceUrl: string, adId: string): Promise<string | null> {
+  try {
+    const imgRes = await fetch(sourceUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)' },
+    })
+    if (!imgRes.ok) return null
+
+    const contentType = imgRes.headers.get('content-type') || 'image/jpeg'
+    const ext = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg'
+    const filePath = `${adId}.${ext}`
+    const body = await imgRes.arrayBuffer()
+
+    const uploadRes = await fetch(
+      `${SUPABASE_URL}/storage/v1/object/${STORAGE_BUCKET}/${filePath}`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+          'Content-Type': contentType,
+          'x-upsert': 'true',
+        },
+        body: Buffer.from(body),
+      }
+    )
+
+    if (!uploadRes.ok) return null
+    return `${SUPABASE_URL}/storage/v1/object/public/${STORAGE_BUCKET}/${filePath}`
+  } catch {
+    return null
+  }
 }
 
 function extractAdData(item: ApifyAdResult, rank: number, brandId: string) {
@@ -49,11 +93,22 @@ function extractAdData(item: ApifyAdResult, rank: number, brandId: string) {
   }
 
   const headline = firstCard?.title || snapshot.title || ''
-  const videoUrl = videos[0]?.video_hd_url || videos[0]?.video_sd_url || null
-  const imageUrl = images[0]?.original_image_url || images[0]?.resized_image_url || null
-  const thumbnailUrl = videos[0]?.video_preview_image_url || imageUrl || null
+
+  // Check cards first (most common), then fall back to snapshot arrays
+  const cardVideoUrl = firstCard?.videoHdUrl || firstCard?.videoSdUrl || null
+  const cardImageUrl = firstCard?.originalImageUrl || firstCard?.resizedImageUrl || null
+  const cardVideoPreview = firstCard?.videoPreviewImageUrl || null
+
+  const snapshotVideoUrl = videos[0]?.video_hd_url || videos[0]?.video_sd_url || null
+  const snapshotImageUrl = images[0]?.original_image_url || images[0]?.resized_image_url || null
+  const snapshotVideoPreview = videos[0]?.video_preview_image_url || null
+
+  const videoUrl = cardVideoUrl || snapshotVideoUrl || null
+  const imageUrl = cardImageUrl || snapshotImageUrl || null
+  const thumbnailUrl = cardVideoPreview || snapshotVideoPreview || imageUrl || null
+
   const creativeType = videoUrl ? 'video' : 'image'
-  const ctaType = snapshot.cta_text || snapshot.cta_type || null
+  const ctaType = snapshot.cta_text || snapshot.ctaText || snapshot.cta_type || snapshot.ctaType || null
   const adLibraryLink = `https://www.facebook.com/ads/library/?id=${adId}`
 
   return {
@@ -72,6 +127,7 @@ function extractAdData(item: ApifyAdResult, rank: number, brandId: string) {
     last_seen: new Date().toISOString(),
     weeks_in_top10: 1,
     bookmarked: false,
+    _source_image_url: thumbnailUrl, // Keep original for storage upload
   }
 }
 
@@ -130,7 +186,9 @@ export async function GET(req: NextRequest) {
       const snapshot = item.snapshot || {}
       const videos = snapshot.videos || []
       const images = snapshot.images || []
-      const mediaUrl = videos[0]?.video_hd_url || videos[0]?.video_sd_url || images[0]?.original_image_url || null
+      const firstCard = snapshot.cards?.[0]
+      const mediaUrl = firstCard?.videoHdUrl || firstCard?.videoSdUrl || firstCard?.originalImageUrl ||
+        videos[0]?.video_hd_url || videos[0]?.video_sd_url || images[0]?.original_image_url || null
       const fingerprint = getMediaFingerprint(mediaUrl)
       const startTimestamp = item.startDate ? new Date(item.startDate).getTime() : Date.now()
 
@@ -174,6 +232,17 @@ export async function GET(req: NextRequest) {
 
     for (let i = 0; i < finalAds.length; i++) {
       const adData = extractAdData(finalAds[i], i + 1, brandId)
+
+      // Upload image to Supabase Storage
+      const sourceImageUrl = (adData as Record<string, unknown>)._source_image_url as string | null
+      if (sourceImageUrl) {
+        const storageUrl = await uploadToStorage(sourceImageUrl, adData.ad_id)
+        if (storageUrl) {
+          adData.creative_url = storageUrl
+        }
+      }
+      // Remove internal field before DB insert
+      delete (adData as Record<string, unknown>)._source_image_url
 
       // Check if ad already exists
       const { data: existing } = await db
