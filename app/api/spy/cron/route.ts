@@ -243,18 +243,21 @@ async function processApifyResults(datasetId: string, brandId: string) {
       const lastSeenWeek = getWeekStart(new Date(existing.last_seen))
       const weeksIncrement = lastSeenWeek !== weekStart ? 1 : 0
 
-      await db
-        .from('spy_ads')
-        .update({
+      const updateFields: Record<string, unknown> = {
           rank: adData.rank,
           last_seen: adData.last_seen,
           weeks_in_top10: existing.weeks_in_top10 + weeksIncrement,
-          creative_url: adData.creative_url,
-          video_url: adData.video_url,
-          ad_copy: adData.ad_copy,
-          headline: adData.headline,
-          cta_type: adData.cta_type,
-        })
+        }
+      // Only overwrite these fields if new data is non-null (prevent erasing existing data)
+      if (adData.creative_url) updateFields.creative_url = adData.creative_url
+      if (adData.video_url) updateFields.video_url = adData.video_url
+      if (adData.ad_copy) updateFields.ad_copy = adData.ad_copy
+      if (adData.headline) updateFields.headline = adData.headline
+      if (adData.cta_type) updateFields.cta_type = adData.cta_type
+
+      await db
+        .from('spy_ads')
+        .update(updateFields)
         .eq('id', existing.id)
     } else {
       await db.from('spy_ads').insert(adData)
