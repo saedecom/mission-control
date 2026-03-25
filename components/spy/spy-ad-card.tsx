@@ -39,8 +39,23 @@ export function SpyAdCard({ ad, onBookmarkToggle, onClick }: SpyAdCardProps) {
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-            No preview
+          <div className="flex flex-col items-center justify-center h-full gap-2 px-4">
+            {ad.headline ? (
+              <p className="text-xs text-center text-muted-foreground line-clamp-3">{ad.headline}</p>
+            ) : (
+              <p className="text-xs text-muted-foreground">No preview</p>
+            )}
+            {ad.ad_library_link && (
+              <a
+                href={ad.ad_library_link}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="text-[10px] text-primary hover:underline"
+              >
+                View on Facebook
+              </a>
+            )}
           </div>
         )}
         {/* Rank badge */}
